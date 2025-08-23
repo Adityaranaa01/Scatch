@@ -1,13 +1,11 @@
 const { default: mongoose } = require('mongoose');
+const dbgr = require('debug')("development:mongoose")
 require('dotenv').config();
 
-mongoose.connect(process.env.MONGO_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-}).then(function(){
-    console.log('MongoDB connected successfully')
+mongoose.connect(process.env.MONGO_URI).then(function(){
+    dbgr("connected")
 }).catch(function(err) {
-    console.log(err)
+    dbgr(err)
 })
 
 module.exports = mongoose.connection
