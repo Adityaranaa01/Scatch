@@ -1,62 +1,72 @@
 const userModel = require('../models/user-model')
+const ownerModel = require('../models/owner-model')
 const bcrypt = require('bcrypt')
-const jwt = require("jsonwebtoken")
 const { generateToken } = require('../utils/generatetoken')
 
 module.exports.registerUser = async (req, res) => {
-    try{
-        let { email, fullname, password } = req.body
-        let user = await userModel.findOne({email})
-        if(user) {
-            req.flash("error", "User already exists.")
-            return res.redirect("/")
-        }
+  try {
+    const { email, fullname, password } = req.body;
 
-        bcrypt.genSalt(10, (err, salt) => {
-            bcrypt.hash(password, salt, async (err, hash) => {
-                if(err) res.send(err.message)
-                else{
-                    let createdUser = await userModel.create({
-                        email,
-                        password: hash,
-                        fullname
-                    })
-                    let token = generateToken(createdUser)
-                    res.status(200).cookie("token", token)
-                    res.status(201).send("User created successfully")
-                }
-            })
-        })
-    }catch(err){
-        console.log(err)
+    // Check if user already exists
+    let user = await userModel.findOne({ email });
+    if (user) {
+      req.flash("error", "User already exists.");
+      return res.redirect("/");
     }
-}
+
+    // Hash password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    // Create user
+    const createdUser = await userModel.create({
+      email,
+      fullname,
+      password: hashedPassword,
+    });
+
+    // Generate JWT token
+    const token = generateToken(createdUser);
+    res.cookie("token", token, { httpOnly: true });
+    return res.redirect("/shop");
+  } catch (err) {
+    console.log(err);
+    req.flash("error", "Something went wrong.");
+    return res.redirect("/");
+  }
+};
 
 module.exports.loginUser = async (req, res) => {
-    try{
-        let { email, password } = req.body
-        let user = await userModel.findOne({email})
+  try {
+    const { email, password } = req.body;
 
-        if(!user) {
-            req.flash("error", "User does not exist.")
-            return res.redirect("/")
-        }
+    // Find user in both userModel and ownerModel
+    let user =
+      (await userModel.findOne({ email })) ||
+      (await ownerModel.findOne({ email }));
 
-        bcrypt.compare(password, user.password, async (err, isMatch) => {
-            if(err) res.send(err.message)
-            else if(isMatch){
-                let token = generateToken(user)
-                res.status(200).cookie("token", token)
-                res.status(200).send("Login successful")
-            }else{
-                req.flash("error", "Invalid email or password.")
-                return res.redirect("/")
-            }
-        })
-    }catch(err){
-        console.log(err)
+    if (!user) {
+      req.flash("error", "User does not exist.");
+      return res.redirect("/");
     }
-}
+
+    // Compare password
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      req.flash("error", "Invalid email or password.");
+      return res.redirect("/");
+    }
+
+    // Generate token and set cookie
+    const token = generateToken(user);
+    res.cookie("token", token, { httpOnly: true });
+    return res.redirect("/shop");
+  } catch (err) {
+    console.log(err);
+    req.flash("error", "Something went wrong.");
+    return res.redirect("/");
+  }
+};
 
 module.exports.logout = (req, res) => {
     res.clearCookie("token")
