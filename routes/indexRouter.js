@@ -11,11 +11,16 @@ router.get("/", function(req,res) {
 
 router.get("/shop", isLoggedIn, async function(req, res) {
     let products = await productModel.find()
-    res.render("shop", { products })
+    let success = req.flash("success")
+    res.render("shop", { products, success })
 })
 
 router.get("/addtocart/:id", isLoggedIn, async function(req, res) {
-    userModel.findOneAndUpdate({ email: req.user.email }, { $push: { cart: req.params.id } })
+    let user = await userModel.findOne({email: req.user.email})
+    user.cart.push(req.params.id)   
+    await user.save()
+    req.flash("success", "Added to cart.")
+    res.redirect("/shop")
 })
 
 router.get("/logout", isLoggedIn, function(req, res) {
